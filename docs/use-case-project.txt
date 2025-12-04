@@ -1,0 +1,39 @@
+[AC-03] Predictive Lead Scoring Portal for Banking Sales
+Accenture
+(Komposisi Tim: 2 Machine Learning + 3 React & Back-End)
+
+Latar Belakang Masalah
+Tim pemasaran dan penjualan di institusi perbankan seringkali melakukan kampanye outbound call untuk menawarkan produk seperti deposito berjangka (term deposit). Namun, proses ini sering tidak efisien karena mereka menghubungi nasabah secara acak atau berdasarkan segmentasi demografis yang sederhana. Akibatnya, sebagian besar waktu sales habis untuk menghubungi nasabah yang tidak tertarik, yang menyebabkan tingkat konversi rendah, biaya operasional tinggi, dan moral tim yang menurun.
+
+Ruang Lingkup Proyek & Tujuan
+
+Scope
+
+1. Membangun model klasifikasi machine learning untuk memprediksi probabilitas seorang nasabah akan berlangganan deposito berjangka.
+2. Model akan dilatih menggunakan Bank Marketing UCI Dataset.
+3. Mengembangkan sebuah portal aplikasi (web-based) prototype yang interaktif untuk tim sales.
+4. Portal akan menampilkan daftar nasabah yang sudah diprioritaskan berdasarkan “skor” atau probabilitas tertinggi untuk dihubungi.
+   Portal juga akan menampilkan informasi kunci nasabah (misalnya, usia, pekerjaan, status perkawinan) untuk membantu sales dalam percepatan.
+
+Objective
+
+1. Meningkatkan efisiensi tim sales dengan memungkinkan mereka fokus pada prospek yang paling menjanjikan.
+2. Meningkatkan tingkat konversi kampanye pemasaran deposito berjangka.
+3. Menyediakan alat bantu (MVP) yang mudah digunakan dan dapat diintegrasikan dalam alur kerja tim sales sehari-hari.
+
+Hasil yang Diharapkan
+
+1. MVP Web Portal:
+   • Halaman login (simulasi) untuk tim sales.
+   • Dashboard utama yang berisi daftar nasabah yang sudah diurutkan berdasarkan skor probabilitas berlangganan.
+   • Fitur pencarian dan filter sederhana (misalnya, berdasarkan skor atau demografi).
+   • Tampilan detail untuk setiap nasabah yang memberikan informasi relevan.
+
+2. Model Machine Learning:
+   • Sebuah Jupyter Notebook yang mendokumentasikan proses dari analisis data hingga finalisasi model.
+
+3. Dokumentasi Proyek:
+   • Dokumentasi arsitektur sistem, penjelasan model, dan panduan singkat penggunaan portal.
+
+Sumber daya yang dapat disediakan oleh perusahaan
+Data pendukung: Bank Marketing Dataset dari UCI Machine Learning Repository.
