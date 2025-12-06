@@ -54,6 +54,10 @@ REQUIRED_INPUT_FIELDS = [
     "campaign", "pdays", "previous", "poutcome"
 ]
 
+# Bulk inference configuration
+MAX_BULK_ROWS = 1000  # Maximum rows for bulk inference
+MISSING_VALUE_STRATEGY = "drop"  # Options: "drop" | "strict"
+
 MONTH_TO_SEASON = {
     'jan': 'winter', 'feb': 'winter', 'mar': 'spring',
     'apr': 'spring', 'may': 'spring', 'jun': 'summer',
@@ -349,6 +353,262 @@ def run_inference(input_dict: dict, artifacts: Artifacts) -> dict:
     except Exception as e:
         logger.exception("Unexpected error during inference")
         raise InferenceError(f"Inference failed: {str(e)}")
+
+
+# =============================================================================
+# BULK INFERENCE FUNCTIONS
+# =============================================================================
+
+def validate_dataframe_columns(df: pd.DataFrame) -> dict:
+    """
+    Validasi kolom DataFrame terhadap kolom yang dibutuhkan.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame dari CSV upload
+    
+    Returns
+    -------
+    dict
+        {
+            "missing_columns": list of missing required columns,
+            "extra_columns": list of columns not recognized
+        }
+    """
+    df_columns = set(df.columns.tolist())
+    required_columns = set(REQUIRED_INPUT_FIELDS)
+    
+    missing_columns = list(required_columns - df_columns)
+    extra_columns = list(df_columns - required_columns)
+    
+    return {
+        "missing_columns": sorted(missing_columns),
+        "extra_columns": sorted(extra_columns)
+    }
+
+
+def clean_dataframe(df: pd.DataFrame) -> dict:
+    """
+    Bersihkan DataFrame: handle missing values dan invalid rows.
+    
+    Strategy (configurable via MISSING_VALUE_STRATEGY):
+    - "drop": Drop rows dengan missing values, laporkan di summary
+    - "strict": Raise error jika ada missing values
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame yang sudah lolos validasi kolom
+    
+    Returns
+    -------
+    dict
+        {
+            "cleaned_df": pd.DataFrame (bersih, siap inference),
+            "original_indices": list (index asli dari row yang valid),
+            "dropped_indices": list (index row yang di-drop karena missing),
+            "invalid_rows": list of {"row_index": int, "reason": str}
+        }
+    """
+    # Keep only required columns + preserve original index
+    df_work = df[REQUIRED_INPUT_FIELDS].copy()
+    df_work['_original_index'] = df.index
+    
+    dropped_indices = []
+    invalid_rows = []
+    
+    # Check for missing values
+    rows_with_missing = df_work[df_work[REQUIRED_INPUT_FIELDS].isnull().any(axis=1)]
+    
+    if len(rows_with_missing) > 0:
+        if MISSING_VALUE_STRATEGY == "strict":
+            raise ValueError(
+                f"Found {len(rows_with_missing)} rows with missing values. "
+                f"Row indices: {rows_with_missing['_original_index'].tolist()}"
+            )
+        else:  # "drop"
+            dropped_indices = rows_with_missing['_original_index'].tolist()
+            df_work = df_work.dropna(subset=REQUIRED_INPUT_FIELDS)
+    
+    # Try to cast numeric columns
+    numeric_columns = ['age', 'balance', 'day', 'campaign', 'pdays', 'previous']
+    
+    for col in numeric_columns:
+        if col in df_work.columns:
+            # Try to convert to numeric
+            original_values = df_work[col].copy()
+            df_work[col] = pd.to_numeric(df_work[col], errors='coerce')
+            
+            # Find rows that failed conversion
+            failed_conversion = df_work[df_work[col].isnull() & original_values.notnull()]
+            for idx in failed_conversion['_original_index']:
+                if idx not in dropped_indices:
+                    invalid_rows.append({
+                        "row_index": int(idx),
+                        "reason": f"Failed to parse numeric field '{col}'"
+                    })
+            
+            # Drop invalid rows
+            df_work = df_work.dropna(subset=[col])
+    
+    # Extract original indices and clean df
+    original_indices = df_work['_original_index'].tolist()
+    cleaned_df = df_work.drop(columns=['_original_index'])
+    
+    # Convert numeric columns to proper int type
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].astype(int)
+    
+    return {
+        "cleaned_df": cleaned_df,
+        "original_indices": original_indices,
+        "dropped_indices": dropped_indices,
+        "invalid_rows": invalid_rows
+    }
+
+
+def _calculate_reason_codes_batch(
+    shap_values_matrix: np.ndarray,
+    feature_names: list,
+    top_n: int = 5
+) -> list:
+    """
+    Extract top N reason codes untuk batch rows dari SHAP values matrix.
+    
+    Parameters
+    ----------
+    shap_values_matrix : np.ndarray
+        SHAP values matrix shape (n_samples, n_features)
+    feature_names : list
+        List nama fitur
+    top_n : int
+        Jumlah top features per row
+    
+    Returns
+    -------
+    list of list
+        List reason codes untuk setiap row
+    """
+    all_reason_codes = []
+    
+    for row_idx in range(shap_values_matrix.shape[0]):
+        shap_values = shap_values_matrix[row_idx]
+        
+        # Get indices sorted by absolute SHAP value (descending)
+        top_indices = np.argsort(np.abs(shap_values))[-top_n:][::-1]
+        
+        reason_codes = []
+        for rank, feat_idx in enumerate(top_indices, 1):
+            shap_val = float(shap_values[feat_idx])
+            reason_codes.append({
+                "feature": feature_names[feat_idx],
+                "direction": "positive" if shap_val > 0 else "negative",
+                "shap_value": shap_val,
+                "rank": rank
+            })
+        
+        all_reason_codes.append(reason_codes)
+    
+    return all_reason_codes
+
+
+def run_bulk_inference(df: pd.DataFrame, original_indices: list, artifacts: Artifacts) -> list:
+    """
+    Jalankan batch inference untuk DataFrame.
+    
+    Fungsi ini menggunakan vectorized operations untuk efisiensi.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame yang sudah dibersihkan (hanya kolom required, no missing values)
+    original_indices : list
+        List index asli dari CSV untuk setiap row
+    artifacts : Artifacts
+        Artifacts yang sudah di-load
+    
+    Returns
+    -------
+    list of dict
+        List prediksi dengan format:
+        {
+            "row_index": int,
+            "probability": float,
+            "prediction": int,
+            "prediction_label": str,
+            "risk_level": str,
+            "reason_codes": list[dict]
+        }
+    
+    Raises
+    ------
+    InferenceError
+        Jika terjadi error dalam pipeline inference.
+    """
+    if len(df) == 0:
+        return []
+    
+    try:
+        # STEP 1: Feature engineering (vectorized)
+        df_featured = _apply_feature_engineering(df)
+        
+        # STEP 2: Label encoding (vectorized)
+        df_encoded = _encode_categoricals(df_featured, artifacts.label_encoders)
+        
+        # STEP 3: Reorder columns sesuai feature_names
+        df_ordered = df_encoded[artifacts.feature_names]
+        
+        # STEP 4: Scaling (batch)
+        X_scaled = artifacts.preprocessor.transform(df_ordered)
+        X_scaled_df = pd.DataFrame(X_scaled, columns=artifacts.feature_names)
+        
+        # STEP 5: Batch prediction
+        probabilities = artifacts.model.predict_proba(X_scaled_df)[:, 1]
+        predictions = artifacts.model.predict(X_scaled_df)
+        
+        # STEP 6: Calculate risk levels (vectorized)
+        risk_levels = []
+        for prob in probabilities:
+            risk_levels.append(_calculate_risk_level(prob))
+        
+        # STEP 7: SHAP reason codes (batch)
+        shap_values = artifacts.shap_explainer.shap_values(X_scaled_df)
+        
+        # Handle different SHAP output formats
+        if isinstance(shap_values, list):
+            # Binary classification: [class_0_values, class_1_values]
+            shap_values_matrix = shap_values[1]
+        else:
+            shap_values_matrix = shap_values
+        
+        # Calculate reason codes for all rows
+        all_reason_codes = _calculate_reason_codes_batch(
+            shap_values_matrix,
+            artifacts.feature_names,
+            top_n=5
+        )
+        
+        # STEP 8: Build results
+        results = []
+        for i in range(len(df)):
+            results.append({
+                "row_index": int(original_indices[i]),
+                "probability": float(probabilities[i]),
+                "prediction": int(predictions[i]),
+                "prediction_label": "yes" if predictions[i] == 1 else "no",
+                "risk_level": risk_levels[i],
+                "reason_codes": all_reason_codes[i]
+            })
+        
+        return results
+        
+    except KeyError as e:
+        raise InferenceError(f"Missing feature during bulk inference: {e}")
+    except Exception as e:
+        logger.exception("Unexpected error during bulk inference")
+        raise InferenceError(f"Bulk inference failed: {str(e)}")
 
 
 # =============================================================================
