@@ -1,6 +1,7 @@
 // Campaign types
 export type {
   CampaignRun,
+  CampaignWithCreator,
   CampaignSummary,
   CreateCampaignRunPayload,
 } from "./campaign";
@@ -14,3 +15,17 @@ export type {
   LeadListItem,
   CreateLeadPayload,
 } from "./lead";
+
+// User types
+export type {
+  UserRole,
+  User,
+  UserSummary,
+  CreateUserPayload,
+  UpdateUserPayload,
+  AuthUser,
+  UserWithAuth,
+} from "./user";
+
+// Database types (auto-generated)
+export type { Database, Json } from "./database";

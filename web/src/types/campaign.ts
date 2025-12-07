@@ -1,3 +1,5 @@
+import type { UserSummary } from "./user";
+
 /**
  * Campaign Run - represents a single CSV upload/scoring session
  */
@@ -21,9 +23,19 @@ export interface CampaignRun {
   status: "processing" | "completed" | "failed";
   error_message: string | null;
 
+  // Audit trail
+  created_by: string | null; // User ID who created this campaign
+
   // Timestamps
   created_at: string; // ISO 8601 string
   updated_at: string;
+}
+
+/**
+ * Campaign with creator info (for joined queries)
+ */
+export interface CampaignWithCreator extends CampaignRun {
+  creator: UserSummary | null;
 }
 
 /**
@@ -37,6 +49,7 @@ export interface CampaignSummary {
   processed_rows: number;
   avg_probability: number | null;
   status: CampaignRun["status"];
+  created_by: string | null;
   created_at: string;
 }
 
@@ -55,4 +68,5 @@ export interface CreateCampaignRunPayload {
   conversion_low: number;
   status?: "processing" | "completed" | "failed";
   error_message?: string | null;
+  created_by?: string | null;
 }

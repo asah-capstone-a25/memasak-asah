@@ -46,6 +46,7 @@ export type Database = {
           conversion_low: number | null
           conversion_medium: number | null
           created_at: string
+          created_by: string | null
           dropped_rows: number
           error_message: string | null
           id: string
@@ -62,6 +63,7 @@ export type Database = {
           conversion_low?: number | null
           conversion_medium?: number | null
           created_at?: string
+          created_by?: string | null
           dropped_rows?: number
           error_message?: string | null
           id?: string
@@ -78,6 +80,7 @@ export type Database = {
           conversion_low?: number | null
           conversion_medium?: number | null
           created_at?: string
+          created_by?: string | null
           dropped_rows?: number
           error_message?: string | null
           id?: string
@@ -88,7 +91,15 @@ export type Database = {
           total_rows?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "campaign_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads: {
         Row: {
@@ -178,6 +189,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      users: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          role: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+          role?: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          role?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
       }
     }
     Views: {
