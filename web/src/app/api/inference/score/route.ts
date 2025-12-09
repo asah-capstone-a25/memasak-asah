@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (!mlResponse.ok) {
-        const errorData = await mlRespo1nse.json().catch(() => ({}));
+        const errorData = await mlResponse.json().catch(() => ({}));
         throw new Error(
           errorData.detail || `ML Service error: ${mlResponse.statusText}`
         );
