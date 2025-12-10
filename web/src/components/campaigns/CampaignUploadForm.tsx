@@ -2,8 +2,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Upload, X, FileText, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useUploadCampaign } from '@/lib/hooks/use-campaigns';
 
 interface CampaignUploadFormProps {
   onClose?: () => void;
@@ -11,10 +13,12 @@ interface CampaignUploadFormProps {
 }
 
 export function CampaignUploadForm({ onClose, onSuccess }: CampaignUploadFormProps) {
+  const router = useRouter();
+  const { uploadCampaign, uploading } = useUploadCampaign();
+  
   const [campaignName, setCampaignName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -64,33 +68,19 @@ export function CampaignUploadForm({ onClose, onSuccess }: CampaignUploadFormPro
       return;
     }
 
-    setUploading(true);
-    setError('');
-
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('name', campaignName.trim());
-
-      const response = await fetch('/api/campaigns/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Upload failed');
-      }
-
-      // Success
+      setError('');
+      const campaign = await uploadCampaign(file, campaignName.trim());
+      
+      // Success callback or redirect
       if (onSuccess) {
-        onSuccess(result.data.campaign.id);
+        onSuccess(campaign.id);
+      } else {
+        router.push(`/campaigns/${campaign.id}`);
       }
     } catch (err) {
+      // Error is already handled in the hook
       setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -103,6 +93,7 @@ export function CampaignUploadForm({ onClose, onSuccess }: CampaignUploadFormPro
           <button 
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg"
+            disabled={uploading}
           >
             <X className="w-5 h-5" />
           </button>
@@ -189,7 +180,7 @@ export function CampaignUploadForm({ onClose, onSuccess }: CampaignUploadFormPro
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
@@ -214,8 +205,8 @@ export function CampaignUploadForm({ onClose, onSuccess }: CampaignUploadFormPro
               Cancel
             </Button>
           )}
-          <Button type="submit" loading={uploading}>
-            {uploading ? 'Uploading...' : 'Upload & Score'}
+          <Button type="submit" loading={uploading} disabled={uploading}>
+            {uploading ? 'Uploading & Scoring...' : 'Upload & Score'}
           </Button>
         </div>
       </form>
