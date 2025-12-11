@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { apiSuccess, apiError, handleApiError } from "@/lib/utils/api";
+import { apiSuccess, handleApiError } from "@/lib/utils/api";
 import { signOut } from "@/lib/auth";
 
 /**
@@ -8,11 +8,7 @@ import { signOut } from "@/lib/auth";
  */
 export async function POST(request: NextRequest) {
   try {
-    const result = await signOut();
-
-    if (result.error) {
-      return apiError(result.error.message, 500);
-    }
+    await signOut();
 
     return apiSuccess({ success: true }, "Signed out successfully");
   } catch (error) {

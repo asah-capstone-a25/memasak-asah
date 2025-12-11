@@ -1,0 +1,508 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Lead Scoring Portal API",
+    "description": "Complete API collection for Lead Scoring Portal.\n\n## Services\n- **Next.js API** (Port 3000): Main backend API with authentication, campaigns, leads, users\n- **ML Service** (Port 8000): FastAPI microservice for lead scoring inference\n\n## Authentication\nThis API uses **cookie-based authentication** via Supabase. After login, cookies are automatically stored and sent with subsequent requests.\n\n## Quick Start\n1. Import this collection\n2. Import the environment file\n3. Start both servers (npm run dev & uvicorn)\n4. Run \"Auth > Signup\" or \"Auth > Login\" first\n5. Other requests will use the session cookies automatically",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "ML Service",
+      "description": "FastAPI ML microservice for lead scoring inference",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ml_base_url}}/",
+              "host": ["{{ml_base_url}}"],
+              "path": [""]
+            },
+            "description": "Get API info and available endpoints"
+          },
+          "response": []
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ml_base_url}}/health",
+              "host": ["{{ml_base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check ML service status and model info"
+          },
+          "response": []
+        },
+        {
+          "name": "Single Score",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 35,\n  \"job\": \"technician\",\n  \"marital\": \"married\",\n  \"education\": \"tertiary\",\n  \"default\": \"no\",\n  \"balance\": 1500,\n  \"housing\": \"yes\",\n  \"loan\": \"no\",\n  \"contact\": \"cellular\",\n  \"day\": 15,\n  \"month\": \"may\",\n  \"campaign\": 2,\n  \"pdays\": -1,\n  \"previous\": 0,\n  \"poutcome\": \"unknown\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{ml_base_url}}/score",
+              "host": ["{{ml_base_url}}"],
+              "path": ["score"]
+            },
+            "description": "Score a single lead record.\n\n**Fields:**\n- age: 18-100\n- job: admin., blue-collar, entrepreneur, housemaid, management, retired, self-employed, services, student, technician, unemployed, unknown\n- marital: divorced, married, single\n- education: primary, secondary, tertiary, unknown\n- default: yes, no\n- balance: integer (EUR)\n- housing: yes, no\n- loan: yes, no\n- contact: cellular, telephone, unknown\n- day: 1-31\n- month: jan-dec\n- campaign: ≥1\n- pdays: ≥-1 (-1 = never contacted)\n- previous: ≥0\n- poutcome: failure, other, success, unknown"
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Score (CSV Upload)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "CSV file with leads data (max 1000 rows)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{ml_base_url}}/bulk-score",
+              "host": ["{{ml_base_url}}"],
+              "path": ["bulk-score"]
+            },
+            "description": "Score multiple leads from CSV file.\n\n**Required CSV columns:**\nage, job, marital, education, default, balance, housing, loan, contact, day, month, campaign, pdays, previous, poutcome\n\n**Limits:**\n- Max 1000 rows per request"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints (cookie-based via Supabase)",
+      "item": [
+        {
+          "name": "Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\",\n  \"username\": \"{{test_username}}\",\n  \"name\": \"{{test_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/auth/signup",
+              "host": ["{{api_base_url}}"],
+              "path": ["auth", "signup"]
+            },
+            "description": "Register a new user.\n\n**Fields:**\n- email: valid email format\n- password: min 6 characters\n- username: 3-50 chars, alphanumeric/hyphens/underscores\n- name: 1-255 characters\n- role: (optional) admin or user (default: user)"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/auth/login",
+              "host": ["{{api_base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticate user and create session.\n\nCookies will be automatically stored by Postman for subsequent requests."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/auth/logout",
+              "host": ["{{api_base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Sign out current user and clear session."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/auth/me",
+              "host": ["{{api_base_url}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Get current authenticated user's profile.\n\n**Requires:** Authentication (login first)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Campaigns",
+      "description": "Campaign management endpoints",
+      "item": [
+        {
+          "name": "List Campaigns",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/campaigns?limit=50",
+              "host": ["{{api_base_url}}"],
+              "path": ["campaigns"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Max results (max 100)"
+                },
+                {
+                  "key": "createdBy",
+                  "value": "",
+                  "description": "Filter by creator UUID",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all campaigns.\n\n**Requires:** Authentication\n\n**Query params:**\n- limit: max results (default 50, max 100)\n- createdBy: filter by creator UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload CSV & Create Campaign",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "CSV file (max 10MB, max 1000 rows)"
+                },
+                {
+                  "key": "name",
+                  "value": "Test Campaign",
+                  "type": "text",
+                  "description": "Campaign name"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_base_url}}/campaigns/upload",
+              "host": ["{{api_base_url}}"],
+              "path": ["campaigns", "upload"]
+            },
+            "description": "Upload CSV file to create a new campaign and score all leads.\n\n**Requires:** Authentication\n\n**Form data:**\n- file: CSV file (max 10MB, max 1000 rows)\n- name: Campaign name\n\n**Required CSV columns:**\nage, job, marital, education, default, balance, housing, loan, contact, day, month, campaign, pdays, previous, poutcome"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Campaign Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/campaigns/{{campaign_id}}",
+              "host": ["{{api_base_url}}"],
+              "path": ["campaigns", "{{campaign_id}}"]
+            },
+            "description": "Get campaign details by ID.\n\n**Requires:** Authentication\n\n**Path params:**\n- campaign_id: Campaign UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Campaign",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/campaigns/{{campaign_id}}",
+              "host": ["{{api_base_url}}"],
+              "path": ["campaigns", "{{campaign_id}}"]
+            },
+            "description": "Delete a campaign and all its leads.\n\n**Requires:** Authentication\n**Authorization:** Campaign creator or Admin\n\n**Path params:**\n- campaign_id: Campaign UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Campaign Leads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/campaigns/{{campaign_id}}/leads?page=1&pageSize=20&sortBy=probability&sortOrder=desc",
+              "host": ["{{api_base_url}}"],
+              "path": ["campaigns", "{{campaign_id}}", "leads"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Results per page (max 100)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "probability",
+                  "description": "Sort field: probability, created_at, age, balance"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "description": "Sort order: asc, desc"
+                },
+                {
+                  "key": "riskLevel",
+                  "value": "High",
+                  "description": "Filter by: Low, Medium, High",
+                  "disabled": true
+                },
+                {
+                  "key": "minProbability",
+                  "value": "0.5",
+                  "description": "Min probability (0-1)",
+                  "disabled": true
+                },
+                {
+                  "key": "maxProbability",
+                  "value": "1",
+                  "description": "Max probability (0-1)",
+                  "disabled": true
+                },
+                {
+                  "key": "job",
+                  "value": "technician",
+                  "description": "Filter by job type",
+                  "disabled": true
+                },
+                {
+                  "key": "education",
+                  "value": "tertiary",
+                  "description": "Filter by education level",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get paginated leads for a campaign with filtering and sorting.\n\n**Requires:** Authentication\n\n**Path params:**\n- campaign_id: Campaign UUID\n\n**Query params:**\n- page: page number (default 1)\n- pageSize: results per page (default 20, max 100)\n- sortBy: probability, created_at, age, balance\n- sortOrder: asc, desc\n- riskLevel: Low, Medium, High\n- minProbability, maxProbability: 0-1\n- job, education: filter by values"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Campaign Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/campaigns/{{campaign_id}}/stats",
+              "host": ["{{api_base_url}}"],
+              "path": ["campaigns", "{{campaign_id}}", "stats"]
+            },
+            "description": "Get aggregated statistics for a campaign.\n\n**Requires:** Authentication\n\n**Path params:**\n- campaign_id: Campaign UUID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Leads",
+      "description": "Lead management endpoints",
+      "item": [
+        {
+          "name": "Get Lead Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/leads/{{lead_id}}",
+              "host": ["{{api_base_url}}"],
+              "path": ["leads", "{{lead_id}}"]
+            },
+            "description": "Get lead details by ID including reason codes.\n\n**Requires:** Authentication\n\n**Path params:**\n- lead_id: Lead UUID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "User management endpoints (Admin)",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/users?limit=50",
+              "host": ["{{api_base_url}}"],
+              "path": ["users"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Max results (max 100)"
+                },
+                {
+                  "key": "role",
+                  "value": "user",
+                  "description": "Filter by role: admin, user",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all users.\n\n**Requires:** Authentication\n**Authorization:** Admin only\n\n**Query params:**\n- limit: max results (default 50, max 100)\n- role: filter by admin or user"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/users/{{user_id}}",
+              "host": ["{{api_base_url}}"],
+              "path": ["users", "{{user_id}}"]
+            },
+            "description": "Get user details by ID.\n\n**Requires:** Authentication\n**Authorization:** Self or Admin\n\n**Path params:**\n- user_id: User UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"username\": \"updatedusername\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/users/{{user_id}}",
+              "host": ["{{api_base_url}}"],
+              "path": ["users", "{{user_id}}"]
+            },
+            "description": "Update user profile.\n\n**Requires:** Authentication\n**Authorization:**\n- Self: can update name, username\n- Admin: can update name, username, role\n\n**Path params:**\n- user_id: User UUID\n\n**Body:**\n- name: new display name\n- username: new username\n- role: new role (admin only)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Inference",
+      "description": "Real-time inference endpoints (via Next.js API)",
+      "item": [
+        {
+          "name": "Single Score (No DB Save)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 35,\n  \"job\": \"technician\",\n  \"marital\": \"married\",\n  \"education\": \"tertiary\",\n  \"default\": \"no\",\n  \"balance\": 1500,\n  \"housing\": \"yes\",\n  \"loan\": \"no\",\n  \"contact\": \"cellular\",\n  \"day\": 15,\n  \"month\": \"may\",\n  \"campaign\": 2,\n  \"pdays\": -1,\n  \"previous\": 0,\n  \"poutcome\": \"unknown\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/inference/score",
+              "host": ["{{api_base_url}}"],
+              "path": ["inference", "score"]
+            },
+            "description": "Score a single lead in real-time without saving to database.\n\nUse this for quick scoring via form input. Results are NOT persisted.\n\n**Requires:** Authentication\n\n**Note:** Unlike campaign upload, this does NOT save results to DB."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "description": "System health check endpoints",
+      "item": [
+        {
+          "name": "System Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/health",
+              "host": ["{{api_base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check system health including API and ML service status.\n\n**No authentication required**"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
