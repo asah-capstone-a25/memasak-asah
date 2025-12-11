@@ -1,3 +1,4 @@
+// web/src/app/api/campaigns/upload/route.ts
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, handleApiError } from "@/lib/utils/api";
 import { getCurrentUser } from "@/lib/api/users";
@@ -9,12 +10,40 @@ import { REQUIRED_CSV_COLUMNS } from "@/lib/validation";
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8000";
 const ML_BULK_MAX_ROWS = parseInt(process.env.ML_BULK_MAX_ROWS || "1000");
 
-// Disable Next.js body parsing for file uploads
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+
+/**
+ * Detect CSV delimiter (comma or semicolon)
+ */
+function detectDelimiter(line: string): ',' | ';' {
+  const commaCount = (line.match(/,/g) || []).length;
+  const semicolonCount = (line.match(/;/g) || []).length;
+  return semicolonCount > commaCount ? ';' : ',';
+}
+
+/**
+ * Parse CSV line with detected delimiter and handle quoted values
+ */
+function parseCSVLine(line: string, delimiter: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === delimiter && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result;
+}
 
 /**
  * POST /api/campaigns/upload
@@ -65,14 +94,28 @@ export async function POST(request: NextRequest) {
 
     // Parse CSV to validate columns
     const fileContent = await file.text();
-    const lines = fileContent.trim().split("\n");
+    const lines = fileContent
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split("\n");
+
     
     if (lines.length < 2) {
       return apiError("CSV file must contain at least a header row and one data row", 400);
     }
 
+    // Detect delimiter from first line
+    const delimiter = detectDelimiter(lines[0]);
+    console.log(`Detected CSV delimiter: "${delimiter}"`);
+
+    // Parse headers with detected delimiter
+    const headerLine = lines[0];
+    const headers = parseCSVLine(headerLine, delimiter)
+      .map((h) => h.toLowerCase().replace(/"/g, '').trim());
+
+    console.log("Parsed headers:", headers);
+
     // Validate CSV headers
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
     const missingColumns = REQUIRED_CSV_COLUMNS.filter(
       (col) => !headers.includes(col)
     );
@@ -81,7 +124,11 @@ export async function POST(request: NextRequest) {
       return apiError(
         `Missing required columns: ${missingColumns.join(", ")}`,
         400,
-        { missingColumns }
+        { 
+          missingColumns,
+          foundColumns: headers,
+          detectedDelimiter: delimiter
+        }
       );
     }
 
@@ -94,6 +141,22 @@ export async function POST(request: NextRequest) {
         400,
         { rowCount: dataRowCount, maxRows: ML_BULK_MAX_ROWS }
       );
+    }
+
+    // Convert CSV to comma-delimited if needed (for ML service)
+    let processedContent = fileContent;
+    if (delimiter === ';') {
+      console.log("Converting semicolon CSV to comma CSV for ML service...");
+      const convertedLines = lines.map(line => {
+        const values = parseCSVLine(line, ';');
+        // Re-quote values that contain commas
+        const quotedValues = values.map(val => {
+          val = val.replace(/"/g, ''); // Remove existing quotes
+          return val.includes(',') ? `"${val}"` : val;
+        });
+        return quotedValues.join(',');
+      });
+      processedContent = convertedLines.join('\n');
     }
 
     // Create campaign record with status "processing"
@@ -114,8 +177,7 @@ export async function POST(request: NextRequest) {
     // Send CSV to ML service
     try {
       const mlFormData = new FormData();
-      // Recreate the file blob from content
-      const blob = new Blob([fileContent], { type: "text/csv" });
+      const blob = new Blob([processedContent], { type: "text/csv" });
       mlFormData.append("file", blob, file.name);
 
       const mlResponse = await fetch(`${ML_SERVICE_URL}/bulk-score`, {
@@ -138,32 +200,43 @@ export async function POST(request: NextRequest) {
       }
 
       // Prepare leads for bulk insert
-      const leadsToInsert = mlResult.predictions.map((prediction: any) => ({
-        campaign_run_id: campaign.id,
-        row_index: prediction.row_index,
-        // Extract customer features from the original CSV row
-        age: parseInt(lines[prediction.row_index + 1].split(",")[headers.indexOf("age")]),
-        job: lines[prediction.row_index + 1].split(",")[headers.indexOf("job")].trim(),
-        marital: lines[prediction.row_index + 1].split(",")[headers.indexOf("marital")].trim(),
-        education: lines[prediction.row_index + 1].split(",")[headers.indexOf("education")].trim(),
-        default_credit: lines[prediction.row_index + 1].split(",")[headers.indexOf("default")].trim(),
-        balance: parseFloat(lines[prediction.row_index + 1].split(",")[headers.indexOf("balance")]),
-        housing: lines[prediction.row_index + 1].split(",")[headers.indexOf("housing")].trim(),
-        loan: lines[prediction.row_index + 1].split(",")[headers.indexOf("loan")].trim(),
-        contact: lines[prediction.row_index + 1].split(",")[headers.indexOf("contact")].trim(),
-        day: parseInt(lines[prediction.row_index + 1].split(",")[headers.indexOf("day")]),
-        month: lines[prediction.row_index + 1].split(",")[headers.indexOf("month")].trim(),
-        campaign: parseInt(lines[prediction.row_index + 1].split(",")[headers.indexOf("campaign")]),
-        pdays: parseInt(lines[prediction.row_index + 1].split(",")[headers.indexOf("pdays")]),
-        previous: parseInt(lines[prediction.row_index + 1].split(",")[headers.indexOf("previous")]),
-        poutcome: lines[prediction.row_index + 1].split(",")[headers.indexOf("poutcome")].trim(),
-        // ML predictions
-        probability: prediction.probability,
-        prediction: prediction.prediction,
-        prediction_label: prediction.prediction_label,
-        risk_level: prediction.risk_level,
-        reason_codes: prediction.reason_codes,
-      }));
+      const leadsToInsert = mlResult.predictions.map((prediction: any) => {
+        const dataLine = lines[prediction.row_index + 1];
+        const values = parseCSVLine(dataLine, delimiter);
+        
+        // Map values to columns
+        const rowData: any = {};
+        headers.forEach((header, idx) => {
+          rowData[header] = values[idx]?.replace(/"/g, '').trim();
+        });
+
+        return {
+          campaign_run_id: campaign.id,
+          row_index: prediction.row_index,
+          // Customer features
+          age: parseInt(rowData.age),
+          job: rowData.job,
+          marital: rowData.marital,
+          education: rowData.education,
+          default_credit: rowData.default,
+          balance: parseFloat(rowData.balance),
+          housing: rowData.housing,
+          loan: rowData.loan,
+          contact: rowData.contact,
+          day: parseInt(rowData.day),
+          month: rowData.month,
+          campaign: parseInt(rowData.campaign),
+          pdays: parseInt(rowData.pdays),
+          previous: parseInt(rowData.previous),
+          poutcome: rowData.poutcome,
+          // ML predictions
+          probability: prediction.probability,
+          prediction: prediction.prediction,
+          prediction_label: prediction.prediction_label,
+          risk_level: prediction.risk_level,
+          reason_codes: prediction.reason_codes,
+        };
+      });
 
       // Bulk insert leads
       await bulkInsertLeads(leadsToInsert);

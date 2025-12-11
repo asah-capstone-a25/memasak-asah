@@ -1,20 +1,21 @@
+// web/src/proxy.ts
 import { updateSession } from "@/lib/supabase/middleware";
 import { type NextRequest } from "next/server";
 
 /**
- * Next.js Middleware for Supabase Auth session management.
+ * Next.js 16 Proxy (previously middleware.ts)
  * 
- * This middleware:
+ * This proxy runs before a request is completed and:
  * 1. Refreshes the user's session on every request
  * 2. Protects routes that require authentication
  * 3. Redirects authenticated users away from auth pages
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }
 
 /**
- * Configure which routes the middleware should run on.
+ * Configure which routes the proxy should run on.
  * 
  * Excludes:
  * - _next/static (static files)
