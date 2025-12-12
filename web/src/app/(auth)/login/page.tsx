@@ -147,15 +147,6 @@ export default function LoginPage() {
               </Link>
             </p>
           </div>
-
-          {/* Demo Credentials */}
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-xs font-semibold text-gray-700 mb-2">Demo Credentials:</p>
-            <div className="space-y-1">
-              <p className="text-xs text-gray-600">Email: demo@accenture.com</p>
-              <p className="text-xs text-gray-600">Password: demo123456</p>
-            </div>
-          </div>
         </div>
       </div>
 

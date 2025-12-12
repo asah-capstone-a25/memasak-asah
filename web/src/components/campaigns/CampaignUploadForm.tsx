@@ -151,7 +151,7 @@ export function CampaignUploadForm({ onClose, onSuccess }: CampaignUploadFormPro
                 />
               </label>
               <p className="text-xs text-gray-500 mt-2">
-                Max file size: 10MB | Max rows: 1000
+                CSV format: comma-separated (,) | Max: 10MB, 1000 rows
               </p>
             </div>
           ) : (

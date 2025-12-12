@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Bell, User, LogOut, Settings, ChevronDown, Home, Upload, Zap, Menu, X, BarChart3 } from 'lucide-react';
+import { Bell, User, LogOut, Settings, ChevronDown, Home, Upload, Zap, Menu, X, BarChart3, Loader2 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import Link from 'next/link';
@@ -14,6 +14,7 @@ export function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Handle scroll effect
@@ -35,6 +36,32 @@ export function Header() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleViewProfile = async () => {
+  setLoadingProfile(true);
+  try {
+    const response = await fetch('/api/auth/me', {
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch profile');
+    }
+    
+    const data = await response.json();
+    console.log('Current user profile:', data);
+    
+    // Tampilkan profile di modal atau alert (untuk demo)
+    alert(`Profile Info:\n\nName: ${data.data.name}\nUsername: ${data.data.username}\nEmail: ${data.data.email || 'N/A'}\nRole: ${data.data.role}\nCreated: ${new Date(data.data.created_at).toLocaleDateString()}`);
+    
+    setShowUserMenu(false);
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    alert('Failed to load profile. Please try again.');
+  } finally {
+    setLoadingProfile(false);
+  }
+};
 
   const handleLogout = async () => {
     await signOut();
@@ -148,10 +175,14 @@ export function Header() {
                 </div>
                 
                 <div className="py-1">
-                  <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors group">
-                    <Settings size={16} className="mr-3 text-gray-400 group-hover:text-primary-500 transition-colors" />
-                    <span>Account Settings</span>
-                  </button>
+                  <Link 
+                  href="/profile"
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors group"
+                  onClick={() => setShowUserMenu(false)}
+                  >
+                  <Settings size={16} className="mr-3 text-gray-400 group-hover:text-primary-500 transition-colors" />
+                  <span>My Profile</span>
+                  </Link>
                 </div>
                 
                 <div className="border-t border-gray-100 my-1" />
